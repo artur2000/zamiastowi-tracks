@@ -2,9 +2,18 @@ import os
 import sys
 import pprint
 from xml.etree import ElementTree as ET
+from timecode import Timecode
+from edl import Parser
+from recordtype import recordtype
 
 pp = pprint.PrettyPrinter(indent=4)
 namespace = 'http://www.topografix.com/GPX/1/1'
+# frame rate one of ['60', '59.94', '50', '30', '29.97', '25', '24', '23.98']
+projectFrameRate = '29.97'
+srcTcOffsetReference = '10:50:35:26'
+
+TimelineEvent = recordtype('TimelineEvent', [('event_no', 0), ('clip_name', 0), ('rec_start_tc', 0), ('rec_end_tc', 0),
+                                             ('src_start_tc', 0), ('src_end_tc', 0)])
 
 class XMLCombiner(object):
     def __init__(self, filenames):
@@ -21,8 +30,6 @@ class XMLCombiner(object):
     def combine(self):
         firstName = self.roots[0].findall(".//{"+ namespace + "}name")[0]
         firstName.text = ' + ' . join(self.filenames)
-        author = self.roots[0].findall(".//{"+ namespace + "}author")[0]
-        author.text = os.path.basename(__file__)
         xpathSearchString = ".//{"+ namespace + "}trkseg"
         firstElement = self.roots[0].findall(xpathSearchString)
         for r in self.roots[1:]:
@@ -49,28 +56,82 @@ def get_track_files_to_combine_txt(filePath):
     with open(filePath) as file:
         lines = file.readlines()
         lines = [line.rstrip() for line in lines]
-    return lines    
+    return lines
 
 def get_track_files_to_combine_fcpxml(filePath):
-    # read the .gpx file from the dialog here
     root = ET.parse(filePath).getroot()
-
     clips = []
     for type_tag in root.findall('./library/event/project/sequence/spine/asset-clip'):
         clips.append(type_tag.get('name') + '.gpx')
-    return clips    
+    return clips
+
+"""
+@see https://github.com/simonh10/python-edl
+required:
+> pip install timecode
+> pip install edl
+"""
+def get_track_files_to_combine_edl(filePath, frameRate):
+    parser = Parser(frameRate)
+    events = []
+    clips = []
+
+    with open(filePath) as f:
+        edl = parser.parse(f)
+        for event in edl.events:
+            tEvent = TimelineEvent()
+            tEvent.event_no = str(event.num)
+            tEvent.clip_name = str(event.clip_name)
+            tEvent.rec_start_tc = str(event.rec_start_tc).replace(';', ':')
+            tEvent.rec_end_tc = str(event.rec_end_tc).replace(';', ':')
+            tEvent.src_start_tc = str(event.src_start_tc).replace(';', ':')
+            tEvent.src_end_tc = str(event.src_end_tc).replace(';', ':')
+            pp.pprint(tEvent)
+            events.append(tEvent)
+            clips.append(str(event.clip_name) + '.gpx')
+    # write the
+    return clips, events
 
 if __name__ == '__main__':
 
+    clips = []
+    timelineEvents = []
+
     # read which track files to combine
-    if (os.path.exists('./combine-clip-tracks.fcpxml')):
-        lines = get_track_files_to_combine_fcpxml('./combine-clip-tracks.fcpxml')  
+    if (os.path.exists('./combine-clip-tracks.edl')):
+        clips, timelineEvents = get_track_files_to_combine_edl('./combine-clip-tracks.edl', projectFrameRate)
+    elif (os.path.exists('./combine-clip-tracks.fcpxml')):
+        clips = get_track_files_to_combine_fcpxml('./combine-clip-tracks.fcpxml')
     elif (os.path.exists('./combine-clip-tracks.txt')):
-        lines = get_track_files_to_combine_csv('./combine-clip-tracks.txt')  
+        clips = get_track_files_to_combine_txt('./combine-clip-tracks.txt')
+
+    # save the list of clip files used in the timeline into a text file
+    if (len(timelineEvents) > 0):
+        targetFileName = os.path.join('.', '_timeline-clips-list.csv')
+        with open(targetFileName, 'w') as f:
+            f.write("num;clip_name;src_start_tc;src_end_tc;rec_start_tc;rec_end_tc;rec_start_tc_offset\n")
+            for timelineEvent in timelineEvents:
+                tc1 = Timecode(projectFrameRate, srcTcOffsetReference)
+                tc2 = Timecode(projectFrameRate, timelineEvent.src_start_tc)
+                if (tc2 > tc1):
+                    print(str(timelineEvent.rec_start_tc), ' - ', str(srcTcOffsetReference))
+                    recTcOffset = tc2 - tc1
+                else:
+                    recTcOffset = 0
+                f.write(';'.join([timelineEvent.event_no, timelineEvent.clip_name, timelineEvent.src_start_tc,
+                                  timelineEvent.src_end_tc, timelineEvent.rec_start_tc,
+                                  timelineEvent.rec_end_tc, str(recTcOffset).replace(';', ':')]) + "\n")
+            f.close()
+    else:
+        targetFileName = os.path.join('.', '_timeline-clips-list.txt')
+        with open(targetFileName, 'w') as f:
+            for clip in clips:
+                f.write(clip + "\n")
+            f.close()
 
     # combine the track files
     ET.register_namespace('', "http://www.topografix.com/GPX/1/1")
-    et = XMLCombiner(lines).combine()
+    et = XMLCombiner(clips).combine()
 
     # save combined track data into a new file
     targetFileName = os.path.join('.', 'telemetry', '_combined-track.gpx')
