@@ -5,7 +5,6 @@ import os
 import argparse
 import sys
 import pprint
-from xml.etree import ElementTree as ET
 from timecode import Timecode
 from edl import Parser
 from recordtype import recordtype
@@ -48,7 +47,6 @@ def get_track_files_edl(filePath, frameRate):
             tEvent.rec_end_tc = str(event.rec_end_tc).replace(';', ':')
             tEvent.src_start_tc = str(event.src_start_tc).replace(';', ':')
             tEvent.src_end_tc = str(event.src_end_tc).replace(';', ':')
-            pp.pprint(tEvent)
             events.append(tEvent)
             clips.append(str(event.clip_name) + '.gpx')
     # write the
@@ -60,29 +58,31 @@ if __name__ == '__main__':
     timelineEvents = []
 
     # read which track files to combine
-    edlFile = os.path.exists(args['file'])
-    if (edlFile):
-        clips, timelineEvents = get_track_files_edl('./combine-clip-tracks.edl', projectFrameRate)
+    edlFile = args['file']
+    if (os.path.exists(edlFile)):
+        clips, timelineEvents = get_track_files_edl(edlFile, projectFrameRate)
 
     # save the list of clip files used in the timeline into a text file
     if (len(timelineEvents) > 0):
-        targetFileName = os.path.join('.', '_timeline-clips-list.csv')
+        targetFileName = os.path.join('.', edlFile + '.csv')
         with open(targetFileName, 'w') as f:
-            f.write("num;clip_name;src_start_tc;src_end_tc;rec_start_tc;rec_end_tc;rec_start_tc_offset\n")
+            f.write("num;clip_name;src_start_tc;src_end_tc;rec_start_tc;rec_end_tc;rec_start_tc_offset;rec_start_tc_offset_end\n")
             for timelineEvent in timelineEvents:
                 tc1 = Timecode(projectFrameRate, srcTcOffsetReference)
                 tc2 = Timecode(projectFrameRate, timelineEvent.src_start_tc)
+                tc3 = Timecode(projectFrameRate, timelineEvent.src_end_tc)
+                clipLength = tc3 - tc2
                 if (tc2 > tc1):
-                    print(str(timelineEvent.rec_start_tc), ' - ', str(srcTcOffsetReference))
                     recTcOffset = tc2 - tc1
                 else:
-                    recTcOffset = 0
+                    recTcOffset = Timecode(projectFrameRate, '00:00:00:00')
+                recTcOffsetEnd = recTcOffset + clipLength
                 f.write(';'.join([timelineEvent.event_no, timelineEvent.clip_name, timelineEvent.src_start_tc,
                                   timelineEvent.src_end_tc, timelineEvent.rec_start_tc,
-                                  timelineEvent.rec_end_tc, str(recTcOffset).replace(';', ':')]) + "\n")
+                                  timelineEvent.rec_end_tc, str(recTcOffset).replace(';', ':'), str(recTcOffsetEnd).replace(';', ':')]) + "\n")
             f.close()
     else:
-        targetFileName = os.path.join('.', '_timeline-clips-list.txt')
+        targetFileName = os.path.join('.', edlFile + '.txt')
         with open(targetFileName, 'w') as f:
             for clip in clips:
                 f.write(clip + "\n")

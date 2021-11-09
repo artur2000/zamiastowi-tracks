@@ -86,7 +86,6 @@ def get_track_files_to_combine_edl(filePath, frameRate):
             tEvent.rec_end_tc = str(event.rec_end_tc).replace(';', ':')
             tEvent.src_start_tc = str(event.src_start_tc).replace(';', ':')
             tEvent.src_end_tc = str(event.src_end_tc).replace(';', ':')
-            pp.pprint(tEvent)
             events.append(tEvent)
             clips.append(str(event.clip_name) + '.gpx')
     # write the
