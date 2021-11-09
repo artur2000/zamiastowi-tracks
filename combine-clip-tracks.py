@@ -105,30 +105,6 @@ if __name__ == '__main__':
     elif (os.path.exists('./combine-clip-tracks.txt')):
         clips = get_track_files_to_combine_txt('./combine-clip-tracks.txt')
 
-    # save the list of clip files used in the timeline into a text file
-    if (len(timelineEvents) > 0):
-        targetFileName = os.path.join('.', '_timeline-clips-list.csv')
-        with open(targetFileName, 'w') as f:
-            f.write("num;clip_name;src_start_tc;src_end_tc;rec_start_tc;rec_end_tc;rec_start_tc_offset\n")
-            for timelineEvent in timelineEvents:
-                tc1 = Timecode(projectFrameRate, srcTcOffsetReference)
-                tc2 = Timecode(projectFrameRate, timelineEvent.src_start_tc)
-                if (tc2 > tc1):
-                    print(str(timelineEvent.rec_start_tc), ' - ', str(srcTcOffsetReference))
-                    recTcOffset = tc2 - tc1
-                else:
-                    recTcOffset = 0
-                f.write(';'.join([timelineEvent.event_no, timelineEvent.clip_name, timelineEvent.src_start_tc,
-                                  timelineEvent.src_end_tc, timelineEvent.rec_start_tc,
-                                  timelineEvent.rec_end_tc, str(recTcOffset).replace(';', ':')]) + "\n")
-            f.close()
-    else:
-        targetFileName = os.path.join('.', '_timeline-clips-list.txt')
-        with open(targetFileName, 'w') as f:
-            for clip in clips:
-                f.write(clip + "\n")
-            f.close()
-
     # combine the track files
     ET.register_namespace('', "http://www.topografix.com/GPX/1/1")
     et = XMLCombiner(clips).combine()
