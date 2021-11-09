@@ -5,6 +5,7 @@ import os
 import argparse
 import sys
 import pprint
+from xml.etree import ElementTree as ET
 from timecode import Timecode
 from edl import Parser
 from recordtype import recordtype
@@ -66,7 +67,7 @@ if __name__ == '__main__':
     if (len(timelineEvents) > 0):
         targetFileName = os.path.join('.', edlFile + '.csv')
         with open(targetFileName, 'w') as f:
-            f.write("num;clip_name;src_start_tc;src_end_tc;rec_start_tc;rec_end_tc;rec_start_tc_offset;rec_start_tc_offset_end\n")
+            f.write("num;clip_name;src_start_tc;src_end_tc;rec_start_tc;rec_end_tc;racerender_offset;racerender_offset_ext;racerender_offset_end\n")
             for timelineEvent in timelineEvents:
                 tc1 = Timecode(projectFrameRate, srcTcOffsetReference)
                 tc2 = Timecode(projectFrameRate, timelineEvent.src_start_tc)
@@ -74,12 +75,25 @@ if __name__ == '__main__':
                 clipLength = tc3 - tc2
                 if (tc2 > tc1):
                     recTcOffset = tc2 - tc1
+                    # make the racerender length 10 frames longer !!!
+                    # it is safe the recoded clip is a bit longer than the original
+                    # we avoid having the "media offline" errors at the end of the clip
+                    recTcOffsetExt = recTcOffset - Timecode(projectFrameRate, '00:00:00:10')
                 else:
-                    recTcOffset = Timecode(projectFrameRate, '00:00:00:00')
+                    recTcOffset = Timecode(projectFrameRate, '00:00:00:10')
+                    recTcOffsetExt = Timecode(projectFrameRate, '00:00:00:00')
                 recTcOffsetEnd = recTcOffset + clipLength
+                # make the racerender length 10 frames longer !!!
+                # it is safe the recoded clip is a bit longer than the original
+                # we avoid having the "media offline" errors at the end of the clip
+                recTcOffsetEnd = recTcOffsetEnd + Timecode(projectFrameRate, '00:00:00:10')
+
+                recTcOffsetEnd.set_fractional(True)
+                recTcOffset.set_fractional(True)
+                recTcOffsetExt.set_fractional(True)
                 f.write(';'.join([timelineEvent.event_no, timelineEvent.clip_name, timelineEvent.src_start_tc,
                                   timelineEvent.src_end_tc, timelineEvent.rec_start_tc,
-                                  timelineEvent.rec_end_tc, str(recTcOffset).replace(';', ':'), str(recTcOffsetEnd).replace(';', ':')]) + "\n")
+                                  timelineEvent.rec_end_tc, str(recTcOffset), str(recTcOffsetExt), str(recTcOffsetEnd)]) + "\n")
             f.close()
     else:
         targetFileName = os.path.join('.', edlFile + '.txt')
