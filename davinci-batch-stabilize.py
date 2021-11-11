@@ -38,12 +38,12 @@ gpuIdleThreshold = int(input("GPU idle threshold in percentage: ") or "3") # in 
 cpuIdleThreshold = int(input("CPU idle threshold in percentage: ") or "3") # in percent
 
 # Set default values or leave it to 0 for configuration on each start
-posXCroppingRatio = 0.5
-posYCroppingRatio = 0.5
-posXSmooth = 0.5
-posYSmooth = 0.5
-posXStrength = 1.0
-posYStrength = 1.0
+posXCroppingRatio = 0
+posYCroppingRatio = 0
+posXSmooth = 0
+posYSmooth = 0
+posXStrength = 0
+posYStrength = 0
 posXStabilize = 0
 posYStabilize = 0
 
